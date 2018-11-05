@@ -1,0 +1,10 @@
+TCP
+- Text chat
+- Inventory
+- Joining/leaving
+- Sending level data
+- Other requests
+UDP
+- Location data
+- If the player is attacking
+- Anything else that needs to be send quickly
