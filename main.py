@@ -434,7 +434,7 @@ def main():
 
         # Update the player.
         active_sprite_list.update()
-
+        active_sprite_list.add(player)
 
         # Update items in the level
         current_level.update()
@@ -461,6 +461,8 @@ def main():
         previousShift = player.level.world_shift
         #Send player location to server
 
+
+
         # ALL CODE TO DRAW SHOULD GO BELOW THIS COMMENT
         current_level.draw(screen)
         active_sprite_list.draw(screen)
@@ -469,7 +471,7 @@ def main():
 
         # Limit to 60 frames per second
         clock.tick(60)
-
+        print(clock.get_fps())
         # Go ahead and update the screen with what we've drawn.
         pygame.display.flip()
 
