@@ -36,10 +36,10 @@ class Player(pygame.sprite.Sprite):
         self.height = 30
         self.username = username
         self.color = color
-        self.image = pygame.Surface([self.width, self.height])
-        self.image.fill(self.color)
+        self.image = pygame.image.load("grim.png")
+        #self.image.fill(self.color)
         self.rect =  self.image.get_rect()
-
+        self.ID = ""
         # Set speed vector of player
         self.change_x = 0
         self.change_y = 0
@@ -47,41 +47,6 @@ class Player(pygame.sprite.Sprite):
         # List of sprites we can bump against
         self.level = None
 
-
-    def update(self):
-        """ Move the player. """
-        # Gravity
-        self.calc_grav()
-
-        # Move left/right
-        self.rect.x += self.change_x
-
-        # See if we hit anything
-        block_hit_list = pygame.sprite.spritecollide(self, self.level.platform_list, False)
-        for block in block_hit_list:
-            # If we are moving right,
-            # set our right side to the left side of the item we hit
-            if self.change_x > 0:
-                self.rect.right = block.rect.left
-            elif self.change_x < 0:
-                # Otherwise if we are moving left, do the opposite.
-                self.rect.left = block.rect.right
-
-        # Move up/down
-        self.rect.y += self.change_y
-
-        # Check and see if we hit anything
-        block_hit_list = pygame.sprite.spritecollide(self, self.level.platform_list, False)
-        for block in block_hit_list:
-
-            # Reset our position based on the top/bottom of the object.
-            if self.change_y > 0:
-                self.rect.bottom = block.rect.top
-            elif self.change_y < 0:
-                self.rect.top = block.rect.bottom
-
-            # Stop our vertical movement
-            self.change_y = 0
 
 
     def calc_grav(self):
@@ -123,8 +88,32 @@ class Player(pygame.sprite.Sprite):
         """ Called when the user lets off the keyboard. """
         self.change_x = 0
 
+class Bullet(pygame.sprite.Sprite):
 
+    def __init__(self, player):
 
+        super().__init__()
+
+        self.player = player
+        #Where the bullet starts from
+        self.startingPosition = (SCREEN_WIDTH/2)
+        #Where the bullet should end at.
+        self.endingPosition = self.player.rect.x + 200
+
+        self.image =  pygame.Surface((5,5))
+        self.image.fill(RED)
+
+        self.rect = self.image.get_rect()
+        self.rect.y = self.player.rect.y
+        self.rect.x = self.startingPosition
+
+    def update(self):
+
+        #We want the position of our bullet to update
+        self.rect.x = self.rect.x + 15
+
+        if self.rect.x > self.endingPosition:
+            self.kill()
 
 class Nametag(pygame.sprite.Sprite):
 
@@ -331,42 +320,50 @@ def startMultiplayer(list_of_players, active_sprite_list):
 
 def getLevelFromServer(player):
 
-    serverRequest  = {'type':"level"}
+    serverRequest  = {'type':"level",
+    'username': player.username}
     data_to_send = pickle.dumps(serverRequest)
     sock.send(bytes(data_to_send))
     data = sock.recv(2048) # get response with level data
     loadedData = pickle.loads(data)
-    Level = multi_level(player, loadedData["level"])
-
+    Level = loadedData['level']
+    Level.player = player
     return Level
 
 
 def mainMultiplayerLoop(list_of_players, active_sprite_list):
     #sock.bind(("127.0.0.1", 5005))
     while True:
-        data = sock.recv(1024) # buffer size is 1024 bytes
+        data = sock.recv(4096) # buffer size is 1024 bytes
         loadedData = pickle.loads(data)
-        flag = True
-        #check if it's a player we already are drawing.
-        for player in list_of_players:
+        #print("Got packet from server")
+        if (loadedData["type"] == "ID"):
+            #we got our unique ID for us
+            list_of_players[0].ID = loadedData["ID"]
+        else:
 
-            if loadedData['username'] == player.username:
+            #check if it's a player we already are drawing.
 
-                flag = False
-                player.rect.x = loadedData['x-pos'] + list_of_players[0].level.world_shift
-                player.rect.y = loadedData['y-pos']
-                break
-        if flag:
+            for datapack in loadedData["playerInformation"]:
+                flag = True
+                #we want to first check if this new player exists
+                for player in list_of_players:
+                    if datapack['username'] == player.username:
+                        #print(datapack['playerPosition'])
+                        player.rect = datapack['playerPosition']
+                        flag = False
 
-            player = Player(loadedData['username'], loadedData['color'])
-            player.level = list_of_players[0].level
-            player.rect.x = loadedData['x-pos'] + list_of_players[0].level.world_shift
-            player.rect.y = loadedData['y-pos']
-            nameTag = Nametag(player)
-            active_sprite_list.add(player)
-            active_sprite_list.add(nameTag)
-            list_of_players[0].level.player_list.add(player)
-            list_of_players.append(player)
+                if flag:
+                    #We create a new player to display on the screen.
+                    player = Player(datapack['username'], RED)
+                    player.level = list_of_players[0].level
+                    player.rect = datapack['playerPosition']
+                    nameTag = Nametag(player)
+                    active_sprite_list.add(player)
+                    active_sprite_list.add(nameTag)
+                    list_of_players[0].level.player_list.add(player)
+                    list_of_players.append(player)
+
 
 def main():
     """ Main Program """
@@ -397,7 +394,7 @@ def main():
     player.level = current_level
 
     player.rect.x = 340
-    player.rect.y = SCREEN_HEIGHT - player.rect.height
+    player.rect.y = SCREEN_HEIGHT
     nameTag = Nametag(player)
     active_sprite_list.add(player)
     active_sprite_list.add(nameTag)
@@ -420,45 +417,91 @@ def main():
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
-                    player.go_left()
+                    #We want to send the update to the server, rather than update and send position
+                    playerMovementData = {
+                    'username': player.username,
+                    'type': 'movement',
+                    'keyPressed': "L",
+                    'uniqueID': player.ID
+                    }
+                    data_to_send = pickle.dumps(playerMovementData)
+                    sock.send(bytes(data_to_send))
+                    #player.go_left()
                 if event.key == pygame.K_RIGHT:
-                    player.go_right()
+                    playerMovementData = {
+                    'username': player.username,
+                    'type': 'movement',
+                    'keyPressed': "R",
+                    'uniqueID': player.ID
+                    }
+                    data_to_send = pickle.dumps(playerMovementData)
+                    sock.send(bytes(data_to_send))
+                    #player.go_right()
                 if event.key == pygame.K_UP:
-                    player.jump()
+                    playerMovementData = {
+                    'username': player.username,
+                    'type': 'movement',
+                    'keyPressed': "U",
+                    'uniqueID': player.ID
+                    }
+                    data_to_send = pickle.dumps(playerMovementData)
+                    sock.send(bytes(data_to_send))
+                    #player.jump()
+                if event.key == pygame.K_x:
+                    playerMovementData = {
+                    'username': player.username,
+                    'type': 'movement',
+                    'keyPressed': "X",
+                    'uniqueID': player.ID
+                    }
+                    data_to_send = pickle.dumps(playerMovementData)
+                    sock.send(bytes(data_to_send))
+                    #we create a bullet for our player
+                    bullet = Bullet(player)
+                    #Add it to our sprite list
+                    active_sprite_list.add(bullet)
 
             if event.type == pygame.KEYUP:
-                if event.key == pygame.K_LEFT and player.change_x < 0:
-                    player.stop()
-                if event.key == pygame.K_RIGHT and player.change_x > 0:
-                    player.stop()
+                if event.key == pygame.K_LEFT:
+                    playerMovementData = {
+                    'username': player.username,
+                    'type': 'movement',
+                    'keyPressed': "S",
+                    'uniqueID': player.ID
+                    }
+                    data_to_send = pickle.dumps(playerMovementData)
+                    sock.send(bytes(data_to_send))
+                    #player.stop()
+                if event.key == pygame.K_RIGHT:
+                    playerMovementData = {
+                    'username': player.username,
+                    'type': 'movement',
+                    'keyPressed': "S",
+                    'uniqueID': player.ID
+                    }
+                    data_to_send = pickle.dumps(playerMovementData)
+                    sock.send(bytes(data_to_send))
+                    #player.stop()
+
+
+
 
         # Update the player.
         active_sprite_list.update()
-        active_sprite_list.add(player)
+
 
         # Update items in the level
         current_level.update()
 
 
-        # If the player gets near the right side, shift the world left (-x)
-        if player.rect.right > (SCREEN_WIDTH/2)+1:
-            diff = player.rect.right - (SCREEN_WIDTH/2)+1
-            player.rect.right = (SCREEN_WIDTH/2)+1
-            current_level.shift_world(-diff)
+        current_level.shift_world(previousX - player.rect.x)
 
 
-
-        # If the player gets near the left side, shift the world right (+x)
-        if player.rect.left < (SCREEN_WIDTH/2)-20:
-            diff = ((SCREEN_WIDTH/2)-20) - player.rect.left
-            player.rect.left = (SCREEN_WIDTH/2)-20
-            current_level.shift_world(diff)
-
-        if previousX != player.rect.x or previousY != player.rect.y or player.level.world_shift != previousShift:
-            sendPOS(player)
+        #if previousX != player.rect.x or previousY != player.rect.y or player.level.world_shift != previousShift:
+        #    sendPOS(player)
         previousX = player.rect.x
-        previousY = player.rect.y
-        previousShift = player.level.world_shift
+        #previousY = player.rect.y
+        #previousShift = player.level.world_shift
         #Send player location to server
 
 
@@ -471,7 +514,6 @@ def main():
 
         # Limit to 60 frames per second
         clock.tick(60)
-        print(clock.get_fps())
         # Go ahead and update the screen with what we've drawn.
         pygame.display.flip()
 
