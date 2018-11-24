@@ -3,7 +3,7 @@ import socket
 import pickle
 import threading
 # Global constants
-UDP_IP = "98.204.46.243"
+UDP_IP = "localhost"
 UDP_PORT = 5005
 sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM) #Socket
 sock.connect((UDP_IP, UDP_PORT))
@@ -15,8 +15,8 @@ RED = (255, 0, 0)
 BLUE = (0, 0, 255)
 
 # Screen dimensions
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 800
+SCREEN_WIDTH = 650
+SCREEN_HEIGHT = 650
 
 class Player(pygame.sprite.Sprite):
     """ This class represents the bar at the bottom that the player
@@ -37,6 +37,7 @@ class Player(pygame.sprite.Sprite):
         self.username = username
         self.color = color
         self.image = pygame.image.load("grim.png")
+        self.FirstPacket = True
         #self.image.fill(self.color)
         self.rect =  self.image.get_rect()
         self.ID = ""
@@ -74,6 +75,42 @@ class Player(pygame.sprite.Sprite):
         # If it is ok to jump, set our speed upwards
         if len(platform_hit_list) > 0 or self.rect.bottom >= SCREEN_HEIGHT:
             self.change_y = -10
+
+    def update(self):
+        """ Move the player. """
+
+        # Gravity
+        self.calc_grav()
+
+        # Move left/right
+        self.rect.x += self.change_x
+
+        # See if we hit anything
+        block_hit_list = pygame.sprite.spritecollide(self, self.level.platform_list, False)
+        for block in block_hit_list:
+            # If we are moving right,
+            # set our right side to the left side of the item we hit
+            if self.change_x > 0:
+                self.rect.right = block.rect.left
+            elif self.change_x < 0:
+                # Otherwise if we are moving left, do the opposite.
+                self.rect.left = block.rect.right
+
+        # Move up/down
+        self.rect.y += self.change_y
+
+        # Check and see if we hit anything
+        block_hit_list = pygame.sprite.spritecollide(self, self.level.platform_list, False)
+        for block in block_hit_list:
+
+            # Reset our position based on the top/bottom of the object.
+            if self.change_y > 0:
+                self.rect.bottom = block.rect.top
+            elif self.change_y < 0:
+                self.rect.top = block.rect.bottom
+
+            # Stop our vertical movement
+            self.change_y = 0
 
     # Player-controlled movement:
     def go_left(self):
@@ -139,8 +176,8 @@ class Wall(pygame.sprite.Sprite):
             code. """
         super().__init__()
 
-        self.image = pygame.Surface([width, height])
-        self.image.fill(GREEN)
+        self.image = pygame.image.load("wall.png")
+
 
         self.rect = self.image.get_rect()
 
@@ -152,13 +189,7 @@ class Platform(pygame.sprite.Sprite):
             an array of 5 numbers like what's defined at the top of this
             code. """
         super().__init__()
-        self.image = pygame.Surface([width, height])
-        self.grass = pygame.Surface([width,height/2])
-        self.grass.fill(GREEN)
-        self.dirt = pygame.Surface([width,height/2])
-        self.dirt.fill((255,0,0))
-        self.image.blit(self.grass, self.image.get_rect().topleft)
-        self.image.blit(self.dirt, self.image.get_rect().bottomleft)
+        self.image = pygame.image.load("platform.png").convert_alpha()
         self.rect = self.image.get_rect()
 
 
@@ -213,7 +244,6 @@ class Level(object):
 
         for player in self.player_list:
             if player != self.player:
-
                 player.rect.x += shift_x
 
 # Create platforms for the level
@@ -226,87 +256,26 @@ class multi_level(Level):
 
         # Array with width, height, x, and y of platform
         tiles = tileData
-        #Each block is 32/32 pixels
+        #each block is 25by25
         # Go through the array above and add platforms
         for row_num, row in enumerate(tiles):
             for tile_num,tile in enumerate(row):
                 if tile == 1:
-                    block = Wall(SCREEN_WIDTH/25, SCREEN_HEIGHT/25)
-                    block.rect.x = (tile_num)*(SCREEN_WIDTH/25)
-                    block.rect.y = (row_num)*(SCREEN_HEIGHT/25)
+                    block = Wall(25, 25)
+                    block.rect.x = (tile_num)*(25)
+                    block.rect.y = (row_num)*(25)
                     block.player = self.player
                     self.platform_list.add(block)
                 if tile == 2:
-                    block = Platform(SCREEN_WIDTH/25, SCREEN_HEIGHT/25)
-                    block.rect.x = (tile_num)*(SCREEN_WIDTH/25)
-                    block.rect.y = (row_num)*(SCREEN_HEIGHT/25)
+                    block = Platform(25, 25)
+                    block.rect.x = (tile_num)*(25)
+                    block.rect.y = (row_num)*(25)
                     block.player = self.player
                     self.platform_list.add(block)
 
 
 
-class Level_01(Level):
-    """ Definition for level 1. """
 
-    def __init__(self, player):
-        """ Create level 1. """
-
-        # Call the parent constructor
-        Level.__init__(self, player)
-
-        # Array with width, height, x, and y of platform
-        tiles = [[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,2,2,2],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,1,2,2,2,2,2,2],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                 [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
-
-        ]
-
-        #Each block is 32/32 pixels
-        # Go through the array above and add platforms
-        for row_num, row in enumerate(tiles):
-            for tile_num,tile in enumerate(row):
-                if tile == 1:
-                    block = Wall(SCREEN_WIDTH/25, SCREEN_HEIGHT/25)
-                    block.rect.x = (tile_num)*(SCREEN_WIDTH/25)
-                    block.rect.y = (row_num)*(SCREEN_HEIGHT/25)
-                    block.player = self.player
-                    self.platform_list.add(block)
-                if tile == 2:
-                    block = Platform(SCREEN_WIDTH/25, SCREEN_HEIGHT/25)
-                    block.rect.x = (tile_num)*(SCREEN_WIDTH/25)
-                    block.rect.y = (row_num)*(SCREEN_HEIGHT/25)
-                    block.player = self.player
-                    self.platform_list.add(block)
-        #for platform in level:
-        #    block = Platform(platform[0], platform[1])
-        #    block.rect.x = platform[2]
-        #    block.rect.y = platform[3]
-        #    block.player = self.player
-        #    self.platform_list.add(block)
-#We send the pos on a player movement update, along with a unique id.
 def sendPOS(player):
     playerInfo = {'type':"playerInfo",'username':player.username, 'x-pos': player.rect.x - player.level.world_shift, 'y-pos': player.rect.y, 'color': player.color}
     data_to_send = pickle.dumps(playerInfo)
@@ -324,10 +293,11 @@ def getLevelFromServer(player):
     'username': player.username}
     data_to_send = pickle.dumps(serverRequest)
     sock.send(bytes(data_to_send))
-    data = sock.recv(2048) # get response with level data
+    data = sock.recv(4096) # get response with level data
     loadedData = pickle.loads(data)
-    Level = loadedData['level']
-    Level.player = player
+
+    Level = multi_level(player, loadedData['level'])
+
     return Level
 
 
@@ -348,16 +318,28 @@ def mainMultiplayerLoop(list_of_players, active_sprite_list):
                 flag = True
                 #we want to first check if this new player exists
                 for player in list_of_players:
+                    if datapack['username'] == list_of_players[0].username:
+                        #print("Packet was for our player")
+                        if player.FirstPacket:
+                            player.rect = datapack['playerPosition']
+                            player.FirstPacket = False
+                        flag = False
+                        break
                     if datapack['username'] == player.username:
                         #print(datapack['playerPosition'])
-                        player.rect = datapack['playerPosition']
+                        dataToInsertIntoPlayer = datapack['playerPosition']
+                        dataToInsertIntoPlayer.x = dataToInsertIntoPlayer.x + player.level.world_shift
+                        player.rect = dataToInsertIntoPlayer
                         flag = False
+
 
                 if flag:
                     #We create a new player to display on the screen.
                     player = Player(datapack['username'], RED)
                     player.level = list_of_players[0].level
-                    player.rect = datapack['playerPosition']
+                    if player.FirstPacket:
+                        player.rect = datapack['playerPosition']
+                        player.FirstPacket = False
                     nameTag = Nametag(player)
                     active_sprite_list.add(player)
                     active_sprite_list.add(nameTag)
@@ -371,7 +353,7 @@ def main():
 
 
     # Set the height and width of the screen
-    size = [SCREEN_WIDTH, SCREEN_HEIGHT]
+    size = [650, 650]
     screen = pygame.display.set_mode(size)
 
     pygame.display.set_caption("Multi Test")
@@ -392,9 +374,6 @@ def main():
     current_level = level_list[current_level_no]
     active_sprite_list = pygame.sprite.Group()
     player.level = current_level
-
-    player.rect.x = 340
-    player.rect.y = SCREEN_HEIGHT
     nameTag = Nametag(player)
     active_sprite_list.add(player)
     active_sprite_list.add(nameTag)
@@ -426,7 +405,7 @@ def main():
                     }
                     data_to_send = pickle.dumps(playerMovementData)
                     sock.send(bytes(data_to_send))
-                    #player.go_left()
+                    player.go_left()
                 if event.key == pygame.K_RIGHT:
                     playerMovementData = {
                     'username': player.username,
@@ -436,7 +415,7 @@ def main():
                     }
                     data_to_send = pickle.dumps(playerMovementData)
                     sock.send(bytes(data_to_send))
-                    #player.go_right()
+                    player.go_right()
                 if event.key == pygame.K_UP:
                     playerMovementData = {
                     'username': player.username,
@@ -446,7 +425,7 @@ def main():
                     }
                     data_to_send = pickle.dumps(playerMovementData)
                     sock.send(bytes(data_to_send))
-                    #player.jump()
+                    player.jump()
                 if event.key == pygame.K_x:
                     playerMovementData = {
                     'username': player.username,
@@ -471,7 +450,7 @@ def main():
                     }
                     data_to_send = pickle.dumps(playerMovementData)
                     sock.send(bytes(data_to_send))
-                    #player.stop()
+                    player.stop()
                 if event.key == pygame.K_RIGHT:
                     playerMovementData = {
                     'username': player.username,
@@ -481,24 +460,39 @@ def main():
                     }
                     data_to_send = pickle.dumps(playerMovementData)
                     sock.send(bytes(data_to_send))
-                    #player.stop()
+                    player.stop()
 
 
 
 
         # Update the player.
         active_sprite_list.update()
-
+        #player.update()
 
         # Update items in the level
         current_level.update()
 
 
-        current_level.shift_world(previousX - player.rect.x)
+
+        #we want to shift when the player moves from the middle of the screen
+        #Where the player is on the client screen is different than from the server
 
 
-        #if previousX != player.rect.x or previousY != player.rect.y or player.level.world_shift != previousShift:
-        #    sendPOS(player)
+        if previousX != player.rect.x:
+            current_level.shift_world(previousX - player.rect.x)
+
+        player.rect.x = (SCREEN_WIDTH/2)
+
+        #If player is moved from middle of screen, set a screen shift of however far
+        #from the middle the player.
+
+        #Can keep track of player position server side.
+        #client side doesn't have to keep track of player position in accordance with the server
+        #server has final say on position
+
+
+
+
         previousX = player.rect.x
         #previousY = player.rect.y
         #previousShift = player.level.world_shift
